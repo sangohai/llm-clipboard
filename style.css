@@ -1,0 +1,42 @@
+/* Markdown 预览区基础样式 */
+#markdown-preview {
+    min-height: 400px;
+    line-height: 1.7;
+    font-size: 16px;
+}
+
+/* 预览区内的图片自适应 */
+#markdown-preview img {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 10px 0;
+}
+
+/* 引用块样式 */
+#markdown-preview blockquote {
+    border-left: 4px solid #dee2e6;
+    padding-left: 1rem;
+    color: #6c757d;
+}
+
+/* 深色模式适配 */
+[data-bs-theme="dark"] #markdown-preview blockquote {
+    border-left-color: #495057;
+    color: #adb5bd;
+}
+
+/* 代码块背景适配 - 使用 Highlight.js 的样式，这里只做容器调整 */
+#markdown-preview pre {
+    padding: 0;
+    border-radius: 6px;
+    background: transparent;
+    /* 让 highlight.js 控制背景 */
+}
+
+/* 编辑器样式 */
+#editor {
+    resize: none;
+    /* 禁止手动拖拽大小，由行数决定 */
+    outline: none;
+    line-height: 1.6;
+}
