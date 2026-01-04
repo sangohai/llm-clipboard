@@ -1,42 +1,89 @@
-/* Markdown 预览区基础样式 */
+/* --- 布局优化 --- */
+
+/* Markdown 预览美化 */
 #markdown-preview {
-    min-height: 400px;
-    line-height: 1.7;
     font-size: 16px;
+    line-height: 1.7;
+    max-width: 900px;
+    margin: 0 auto;
 }
 
-/* 预览区内的图片自适应 */
 #markdown-preview img {
     max-width: 100%;
-    border-radius: 6px;
+    border-radius: 8px;
     margin: 10px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* 引用块样式 */
 #markdown-preview blockquote {
     border-left: 4px solid #dee2e6;
     padding-left: 1rem;
     color: #6c757d;
 }
 
-/* 深色模式适配 */
 [data-bs-theme="dark"] #markdown-preview blockquote {
     border-left-color: #495057;
     color: #adb5bd;
 }
 
-/* 代码块背景适配 - 使用 Highlight.js 的样式，这里只做容器调整 */
-#markdown-preview pre {
-    padding: 0;
-    border-radius: 6px;
-    background: transparent;
-    /* 让 highlight.js 控制背景 */
+/* 侧边栏列表激活样式 */
+.list-group-item.active {
+    background-color: var(--bs-primary-bg-subtle) !important;
+    color: var(--bs-primary-text-emphasis) !important;
+    border-color: transparent !important;
+    border-left: 4px solid var(--bs-primary) !important;
+    font-weight: bold;
 }
 
-/* 编辑器样式 */
-#editor {
-    resize: none;
-    /* 禁止手动拖拽大小，由行数决定 */
-    outline: none;
-    line-height: 1.6;
+/* 滚动条美化 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #adb5bd;
+    border-radius: 3px;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #495057;
+}
+
+/* --- 按钮与交互优化 --- */
+
+/* 统一导航栏按钮不换行 */
+.navbar .btn,
+.card-header .btn {
+    white-space: nowrap !important;
+}
+
+/* 增大 PC 端按钮的点击感 */
+@media (min-width: 576px) {
+    .btn-sm {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        font-weight: 500;
+    }
+}
+
+/* 响应式：在窄屏下隐藏按钮文字，仅保留图标以节省空间 */
+@media (max-width: 576px) {
+    .btn-sm span {
+        display: none;
+    }
+}
+
+/* 针对文件夹选择框的微调 */
+#folderSelector {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#folderSelector:hover {
+    background-color: var(--bs-secondary-bg) !important;
 }

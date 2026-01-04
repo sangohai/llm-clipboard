@@ -1,277 +1,409 @@
 // --- 全局变量 ---
 let config = { token: '', owner: '', repo: '', path: '' };
+let currentFolder = ''; 
+let currentFileSha = ''; 
 let autoSaveTimer = null;
 let isDark = false;
+let imageCache = new Map(); // 私有图片缓存
 const API_BASE = 'https://api.github.com/repos';
 
-// --- 初始化生命周期 ---
+// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. 优先检查外部导入 (来自扫码跳转)
     checkImport();
-
-    // 2. 加载本地配置和主题
     loadSettings();
     initTheme();
 
-    // 3. 根据配置状态决定下一步
     if (config.token && config.repo) {
-        fetchFileList(); // 有配置，直接加载
+        fetchFolderList().then(() => fetchFileList());
     } else {
-        openSettings();  // 无配置，弹窗提示
+        openSettings();
     }
+
+    // 绑定粘贴事件
+    document.getElementById('editor').addEventListener('paste', handlePaste);
 });
 
-// --- 关键：配置导入逻辑 (从 my-tools 接收数据) ---
-function checkImport() {
-    // 监听 URL Hash 格式：#import=BASE64_JSON
-    const hash = window.location.hash.substring(1); // 去掉 #
-    const params = new URLSearchParams(hash);
-    const importData = params.get('import');
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    if (importData) {
-        try {
-            // Base64 解码
-            const configStr = atob(importData);
-            const configObj = JSON.parse(configStr);
+// --- 搜索功能 ---
+function filterFiles() {
+    const keyword = document.getElementById('fileSearchInput').value.toLowerCase();
+    const items = document.querySelectorAll('#fileListGroup a');
+    items.forEach(item => {
+        const text = item.innerText.toLowerCase();
+        item.style.display = text.includes(keyword) ? 'block' : 'none';
+    });
+}
 
-            // 简单验证
-            if (!configObj.token || !configObj.repo) throw new Error("配置数据不完整");
-
-            // 保存到 LocalStorage
-            localStorage.setItem('llm_clip_config', JSON.stringify(configObj));
-
-            // 清理 URL (深藏功与名)
-            history.replaceState(null, null, window.location.pathname);
-
-            alert("✅ 扫码登录成功！配置已同步。");
-            
-            // 刷新页面以应用新配置
-            window.location.reload();
-
-        } catch (e) {
-            console.error("导入失败", e);
-            alert("❌ 配置导入失败：数据格式错误");
+// --- 图片上传与压缩逻辑 ---
+async function handlePaste(e) {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let item of items) {
+        if (item.type.indexOf('image') !== -1) {
+            e.preventDefault();
+            const blob = item.getAsFile();
+            await processAndUploadImage(blob);
         }
     }
 }
 
-// --- GitHub API 交互 ---
+function triggerImageUpload() {
+    if (!config.path) { alert("请先选择或新建一个文档"); return; }
+    document.getElementById('imageFileInput').click();
+}
 
-// 1. 获取文件列表
-async function fetchFileList() {
-    const select = document.getElementById('fileSelector');
+async function handleImageFileSelect(input) {
+    if (input.files && input.files[0]) {
+        await processAndUploadImage(input.files[0]);
+        input.value = ''; // 重置清空
+    }
+}
+
+async function processAndUploadImage(blob) {
+    const editor = document.getElementById('editor');
+    const start = editor.selectionStart;
+    const fileName = `img_${Date.now()}.webp`;
+    const filePath = `assets/images/${fileName}`;
+    const placeholder = `\n![正在上传图片...](${filePath})\n`;
+
+    // 插入占位符
+    editor.value = editor.value.substring(0, start) + placeholder + editor.value.substring(editor.selectionEnd);
+    setSaveStatus("loading", "正在压缩并上传...");
+
     try {
-        const url = `${API_BASE}/${config.owner}/${config.repo}/contents`;
-        const res = await fetch(url, { headers: { 'Authorization': `token ${config.token}` } });
+        const base64Data = await compressImage(blob);
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${filePath}`;
         
-        if (res.status === 404) throw new Error("仓库未找到或无权限");
-        const data = await res.json();
-        
-        // 清空并填充列表
-        select.innerHTML = '';
-        let foundCurrent = false;
-
-        // 筛选 .md, .yaml, .txt
-        data.forEach(file => {
-            if (file.type === 'file' && /\.(md|yaml|yml|txt|json)$/i.test(file.name)) {
-                const option = document.createElement('option');
-                option.value = file.name;
-                option.text = file.name;
-                select.appendChild(option);
-                if (file.name === config.path) foundCurrent = true;
-            }
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: `Upload image ${fileName}`,
+                content: base64Data.split(',')[1]
+            })
         });
 
-        if (select.options.length === 0) {
-            const opt = document.createElement('option');
-            opt.text = "(空仓库 - 请先手动创建文件)";
-            select.add(opt);
-            return;
-        }
-
-        // 默认选中逻辑
-        if (!foundCurrent && select.options.length > 0) {
-            config.path = select.options[0].value;
-            saveConfigToLocal();
-        } else {
-            select.value = config.path;
-        }
-
-        // 立即拉取内容
-        loadContent();
-
+        if (res.ok) {
+            editor.value = editor.value.replace(placeholder, `\n![${fileName}](${filePath})\n`);
+            setSaveStatus("success", "图片上传成功");
+            renderMarkdown(editor.value);
+            manualSave();
+        } else { throw new Error(); }
     } catch (err) {
-        console.error(err);
-        select.innerHTML = '<option>连接失败 (检查配置)</option>';
-        if(!config.token) openSettings();
+        alert("图片上传失败");
+        editor.value = editor.value.replace(placeholder, "\n[图片上传失败]\n");
     }
 }
 
-// 2. 切换文件
-function changeFile() {
-    const select = document.getElementById('fileSelector');
-    config.path = select.value;
-    saveConfigToLocal();
-    loadContent();
+function compressImage(blob) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                const MAX_WIDTH = 1200;
+                if (w > MAX_WIDTH) { h = (MAX_WIDTH / w) * h; w = MAX_WIDTH; }
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/webp', 0.8));
+            };
+        };
+    });
 }
 
-// 3. 拉取内容 (GET)
-async function loadContent() {
-    if (!config.token || !config.path) return;
-    setSaveStatus("loading", "正在拉取...");
+// --- 文件夹管理 ---
+async function fetchFolderList() {
+    const selector = document.getElementById('folderSelector');
+    selector.innerHTML = '<option value="">📂 根目录</option>';
+    try {
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents?t=${Date.now()}`;
+        const res = await fetch(url, { headers: { 'Authorization': `token ${config.token}` } });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+            data.filter(i => i.type === 'dir').forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.path; opt.text = `📂 ${f.name}`;
+                selector.appendChild(opt);
+            });
+        }
+        if (currentFolder) selector.value = currentFolder;
+    } catch (err) { console.error(err); }
+}
+
+function changeFolder() {
+    currentFolder = document.getElementById('folderSelector').value;
+    const hasFolder = currentFolder !== "";
+    document.getElementById('btnDeleteFolder').style.display = hasFolder ? 'inline-block' : 'none';
+    document.getElementById('btnRenameFolder').style.display = hasFolder ? 'inline-block' : 'none';
+    fetchFileList();
+}
+
+async function createNewFolder() {
+    let name = prompt("请输入新文件夹名称:");
+    if (!name) return;
+    name = name.replace(/[\/\\]/g, '').trim();
+    const path = `${name}/.gitkeep`;
+    setSaveStatus("loading", "创建中...");
+    try {
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${path}`;
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Create folder ${name}`, content: btoa("") })
+        });
+        if (res.ok) {
+            await sleep(1000); await fetchFolderList();
+            document.getElementById('folderSelector').value = name;
+            currentFolder = name; await fetchFileList();
+        }
+    } catch (e) { alert("创建失败"); }
+    finally { setSaveStatus("success", "就绪"); }
+}
+
+async function renameCurrentFolder() {
+    if (!currentFolder) return;
+    const newName = prompt(`重命名 [${currentFolder}] 为:`, currentFolder);
+    if (!newName || newName === currentFolder) return;
+    const cleanNewName = newName.replace(/[\/\\]/g, '').trim();
+
+    if (!confirm(`确定要重命名文件夹吗？内部文件将批量移动。`)) return;
+    setSaveStatus("loading", "正在重命名路径...");
 
     try {
-        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${config.path}?t=${Date.now()}`;
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${currentFolder}?t=${Date.now()}`;
+        const items = await (await fetch(url, { headers: { 'Authorization': `token ${config.token}` } })).json();
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            setSaveStatus("loading", `搬迁中 (${i + 1}/${items.length})`);
+            const fileData = await (await fetch(item.url, { headers: { 'Authorization': `token ${config.token}` } })).json();
+            
+            // PUT 新路径
+            await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${cleanNewName}/${item.name}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Rename move`, content: fileData.content })
+            });
+            // DELETE 旧路径
+            await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${item.path}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Rename cleanup`, sha: item.sha })
+            });
+        }
+        await sleep(1000);
+        const oldPath = currentFolder;
+        currentFolder = cleanNewName;
+        if (config.path.startsWith(oldPath + "/")) {
+            config.path = config.path.replace(oldPath + "/", cleanNewName + "/");
+            saveConfigToLocal();
+        }
+        await fetchFolderList();
+        document.getElementById('folderSelector').value = cleanNewName;
+        await fetchFileList();
+    } catch (e) { alert("操作失败"); }
+    finally { setSaveStatus("success", "就绪"); }
+}
+
+async function deleteCurrentFolder() {
+    if (!currentFolder || !confirm(`确定彻底删除文件夹 [${currentFolder}] 吗？`)) return;
+    setSaveStatus("loading", "清理中...");
+    try {
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${currentFolder}?t=${Date.now()}`;
+        const items = await (await fetch(url, { headers: { 'Authorization': `token ${config.token}` } })).json();
+        for (let item of items) {
+            await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${item.path}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Delete bulk`, sha: item.sha })
+            });
+        }
+        await sleep(1500); currentFolder = ''; await fetchFolderList(); await fetchFileList();
+    } catch (e) { alert("删除失败"); }
+    finally { setSaveStatus("success", "就绪"); }
+}
+
+// --- 文件操作 ---
+async function fetchFileList() {
+    const listGroup = document.getElementById('fileListGroup');
+    listGroup.innerHTML = '<div class="p-4 text-center">...</div>';
+    try {
+        const path = currentFolder ? `/${currentFolder}` : '';
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents${path}?t=${Date.now()}`;
         const res = await fetch(url, { headers: { 'Authorization': `token ${config.token}` } });
-        
-        if (!res.ok) throw new Error(res.status);
-        
         const data = await res.json();
-        // 解决中文乱码
+        listGroup.innerHTML = '';
+        if (Array.isArray(data)) {
+            data.filter(f => f.type === 'file' && /\.(md|txt|json)$/i.test(f.name)).forEach(file => {
+                const a = document.createElement('a');
+                a.className = `list-group-item list-group-item-action py-2 ${file.path === config.path ? 'active' : ''}`;
+                a.innerHTML = `<span class="text-truncate fw-medium">${file.name}</span>`;
+                a.onclick = () => switchFile(file.path, file.name);
+                listGroup.appendChild(a);
+            });
+        }
+    } catch (e) { listGroup.innerHTML = '加载失败'; }
+}
+
+async function createNewFile() {
+    let name = prompt("文档名称:");
+    if (!name) return; if (!name.includes('.')) name += '.md';
+    const path = currentFolder ? `${currentFolder}/${name}` : name;
+    setSaveStatus("loading", "同步中...");
+    try {
+        const res = await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${path}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Create ${path}`, content: encodeUnicode(`# ${name}\n`) })
+        });
+        if (res.ok) { await sleep(1000); await fetchFileList(); switchFile(path, name); }
+    } catch (e) { alert("失败"); }
+    finally { setSaveStatus("success", "就绪"); }
+}
+
+async function deleteCurrentFile() {
+    if (!config.path || !confirm("确定要永久删除此文档吗？")) return;
+    setSaveStatus("loading", "正在删除...");
+    try {
+        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${config.path}`;
+        const info = await (await fetch(url, { headers: { 'Authorization': `token ${config.token}` } })).json();
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Delete ${config.path}`, sha: info.sha })
+        });
+        if (res.ok) {
+            await sleep(800);
+            if (currentFolder) {
+                const fData = await (await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${currentFolder}`, { headers: { 'Authorization': `token ${config.token}` } })).json();
+                if (Array.isArray(fData) && fData.length === 1 && fData[0].name === '.gitkeep') {
+                    await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${fData[0].path}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: 'Auto cleanup', sha: fData[0].sha })
+                    });
+                    currentFolder = ''; await fetchFolderList();
+                }
+            }
+            config.path = ''; await fetchFileList(); switchFile('', '');
+        }
+    } catch (e) { alert("操作失败"); }
+    finally { setSaveStatus("success", "就绪"); }
+}
+
+function switchFile(path, name) {
+    config.path = path; saveConfigToLocal();
+    document.getElementById('currentFileName').innerText = name || path.split('/').pop() || '未选择文件';
+    document.getElementById('btnDelete').style.display = path ? 'inline-block' : 'none';
+    if (path) loadContent(); else { document.getElementById('editor').value = ''; renderMarkdown(''); }
+}
+
+async function loadContent() {
+    if (!config.path) return;
+    setSaveStatus("loading", "读取中...");
+    try {
+        const res = await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${config.path}?t=${Date.now()}`, {
+            headers: { 'Authorization': `token ${config.token}` }
+        });
+        const data = await res.json();
+        currentFileSha = data.sha;
         const content = decodeUnicode(data.content);
-        
         document.getElementById('editor').value = content;
         renderMarkdown(content);
         setSaveStatus("success", "已同步");
-
-    } catch (err) {
-        console.error(err);
-        setSaveStatus("error", "拉取失败");
-    }
+    } catch (e) { setSaveStatus("error", "同步失败"); }
 }
 
-// 4. 保存内容 (PUT)
 async function pushContent() {
-    if (!config.token) return;
-    setSaveStatus("loading", "正在推送...");
-
+    if (!config.path) return;
     const content = document.getElementById('editor').value;
-    renderMarkdown(content); // 同步更新预览
-
     try {
-        // 先获取 SHA
-        const url = `${API_BASE}/${config.owner}/${config.repo}/contents/${config.path}`;
-        const getRes = await fetch(url, { headers: { 'Authorization': `token ${config.token}` } });
-        let sha = null;
-        if (getRes.ok) {
-            const getData = await getRes.json();
-            sha = getData.sha;
-        }
-
-        // 提交更新
-        const body = {
-            message: `Update ${config.path} - ${new Date().toLocaleTimeString()}`,
-            content: encodeUnicode(content)
-        };
-        if (sha) body.sha = sha;
-
-        const putRes = await fetch(url, {
+        const res = await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${config.path}`, {
             method: 'PUT',
-            headers: {
-                'Authorization': `token ${config.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
+            headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Update', content: encodeUnicode(content), sha: currentFileSha })
         });
-
-        if (!putRes.ok) throw new Error("Save Failed");
-        setSaveStatus("success", "已自动保存");
-
-    } catch (err) {
-        console.error(err);
-        setSaveStatus("error", "保存失败");
-    }
+        const data = await res.json();
+        if (res.ok) { currentFileSha = data.content.sha; setSaveStatus("success", "已保存"); }
+    } catch (e) { setSaveStatus("error", "保存失败"); }
 }
-
-// --- 自动保存与辅助逻辑 ---
 
 function handleInput() {
-    setSaveStatus("unsaved", "输入中...");
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    // 5秒无操作后自动保存
-    autoSaveTimer = setTimeout(() => {
-        pushContent();
-    }, 5000);
+    setSaveStatus("unsaved", "等待保存...");
+    renderMarkdown(document.getElementById('editor').value);
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(pushContent, 5000);
 }
 
-function manualSave() {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    pushContent();
-}
-
-function renderMarkdown(text) {
+// --- 增强渲染 (私有图片支持) ---
+async function renderMarkdown(text) {
     const preview = document.getElementById('markdown-preview');
-    // 使用 Marked 解析
     preview.innerHTML = marked.parse(text || '');
-    // 代码高亮
-    preview.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el));
+    preview.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+
+    const imgs = preview.querySelectorAll('img');
+    for (let img of imgs) {
+        const src = img.getAttribute('src');
+        if (src && src.includes('assets/images') && !src.startsWith('http')) {
+            if (imageCache.has(src)) {
+                img.src = imageCache.get(src);
+            } else {
+                try {
+                    const res = await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${src}`, {
+                        headers: { 'Authorization': `token ${config.token}` }
+                    });
+                    const data = await res.json();
+                    const blob = await (await fetch(`data:image/webp;base64,${data.content}`)).blob();
+                    const objUrl = URL.createObjectURL(blob);
+                    imageCache.set(src, objUrl);
+                    img.src = objUrl;
+                } catch (e) { console.error("图片加载失败", src); }
+            }
+        }
+    }
 }
 
-// 状态指示器
-function setSaveStatus(state, text) {
-    const el = document.getElementById('saveStatus');
-    el.innerText = text;
-    el.className = 'badge rounded-pill fw-normal ';
-    
-    if (state === 'loading') el.classList.add('text-bg-warning');
-    else if (state === 'success') el.classList.add('text-bg-success');
-    else if (state === 'unsaved') el.classList.add('text-bg-secondary');
-    else if (state === 'error') el.classList.add('text-bg-danger');
+// --- 基础工具 ---
+function encodeUnicode(s) { return btoa(encodeURIComponent(s).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode('0x' + p1))); }
+function decodeUnicode(s) { return decodeURIComponent(atob(s).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
+function setSaveStatus(s, t) {
+    const el = document.getElementById('saveStatus'); el.innerText = t;
+    el.className = 'badge rounded-pill fw-normal small ' + (s==='loading'?'text-bg-warning':s==='success'?'text-bg-success':s==='error'?'text-bg-danger':'text-bg-secondary');
 }
-
-// Base64 处理 (解决中文乱码)
-function encodeUnicode(str) {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
-}
-function decodeUnicode(str) {
-    return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-}
-
-// --- 设置与主题 ---
-function loadSettings() {
-    const saved = localStorage.getItem('llm_clip_config');
-    if (saved) config = JSON.parse(saved);
-}
-
+function manualSave() { clearTimeout(autoSaveTimer); pushContent(); }
+function loadSettings() { const s = localStorage.getItem('llm_clip_config'); if(s) config = JSON.parse(s); }
+function saveConfigToLocal() { localStorage.setItem('llm_clip_config', JSON.stringify(config)); }
 function saveSettings() {
     config.token = document.getElementById('cfgToken').value.trim();
     config.owner = document.getElementById('cfgUser').value.trim();
     config.repo = document.getElementById('cfgRepo').value.trim();
-    saveConfigToLocal();
-    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
-    fetchFileList();
+    saveConfigToLocal(); location.reload();
 }
-
-function saveConfigToLocal() {
-    localStorage.setItem('llm_clip_config', JSON.stringify(config));
+function openSettings() { 
+    new bootstrap.Modal(document.getElementById('settingsModal')).show();
+    document.getElementById('cfgToken').value = config.token;
+    document.getElementById('cfgUser').value = config.owner;
+    document.getElementById('cfgRepo').value = config.repo;
 }
-
-function openSettings() {
-    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
-    document.getElementById('cfgToken').value = config.token || '';
-    document.getElementById('cfgUser').value = config.owner || '';
-    document.getElementById('cfgRepo').value = config.repo || '';
-    modal.show();
+function toggleTheme() { isDark = !isDark; localStorage.setItem('theme', isDark?'dark':'light'); applyTheme(); }
+function applyTheme() { 
+    document.documentElement.setAttribute('data-bs-theme', isDark?'dark':'light');
+    document.getElementById('themeBtn').innerText = isDark?'☀️':'🌙';
 }
-
-function initTheme() {
-    isDark = localStorage.getItem('theme') === 'dark';
-    applyTheme();
+function initTheme() { isDark = localStorage.getItem('theme')==='dark'; applyTheme(); }
+function checkImport() {
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const data = params.get('import');
+    if (data) {
+        localStorage.setItem('llm_clip_config', atob(data));
+        history.replaceState(null,null,window.location.pathname);
+        location.reload();
+    }
 }
-function toggleTheme() {
-    isDark = !isDark;
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    applyTheme();
-}
-function applyTheme() {
-    document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
-    document.getElementById('themeBtn').innerText = isDark ? '☀️' : '🌙';
-}
-
-function copyToClipboard() {
-    navigator.clipboard.writeText(document.getElementById('editor').value).then(() => {
-        const originalText = document.getElementById('saveStatus').innerText;
-        setSaveStatus('success', '已复制!');
-        setTimeout(() => setSaveStatus('success', originalText), 1500);
-    });
-}
+function copyToClipboard() { navigator.clipboard.writeText(document.getElementById('editor').value).then(()=>alert("已复制全文到剪贴板")); }

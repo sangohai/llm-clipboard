@@ -4,118 +4,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM 云剪贴板</title>
+    <title>LLM 知识库 Pro</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- 代码高亮 CSS (GitHub Dark) -->
+    <!-- Highlight.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
     <!-- 自定义 CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="bg-body-tertiary">
+<body class="bg-body-tertiary overflow-hidden">
 
-    <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom sticky-top">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="#">📋 LLM Clipboard</a>
-            <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-secondary border-0" onclick="toggleTheme()" id="themeBtn"
-                    title="切换主题">🌙</button>
-                <button class="btn btn-sm btn-outline-primary" onclick="openSettings()">⚙️ 设置</button>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-expand bg-body border-bottom shadow-sm" style="height: 60px;">
+        <div class="container-fluid flex-nowrap">
+            <!-- 手机端菜单按钮 -->
+            <button class="btn btn-outline-secondary d-md-none me-2 border-0 flex-shrink-0" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu">
+                ☰
+            </button>
+
+            <!-- Logo -->
+            <a class="navbar-brand fw-bold text-primary d-none d-lg-block flex-shrink-0" href="#">📚 LLM Note</a>
+
+            <!-- 文件夹管理区：增加 gap-2 和 flex-nowrap 确保不换行 -->
+            <div class="d-flex align-items-center gap-2 mx-lg-3 mx-1 flex-nowrap overflow-hidden">
+                <select id="folderSelector"
+                    class="form-select form-select-sm border-0 bg-body-tertiary fw-bold flex-shrink-1"
+                    style="min-width: 100px; max-width: 180px;" onchange="changeFolder()">
+                    <option value="">📂 根目录</option>
+                </select>
+
+                <!-- 重命名按钮：增加 text-nowrap 和 flex-shrink-0 -->
+                <button id="btnRenameFolder"
+                    class="btn btn-sm btn-outline-primary border-0 py-1 px-2 text-nowrap flex-shrink-0"
+                    onclick="renameCurrentFolder()" style="display:none;" title="重命名当前文件夹">
+                    ✏️ <span class="d-none d-sm-inline">重命名</span>
+                </button>
+
+                <!-- 删除目录按钮：增加 text-nowrap 和 flex-shrink-0 -->
+                <button id="btnDeleteFolder"
+                    class="btn btn-sm btn-outline-danger border-0 py-1 px-2 text-nowrap flex-shrink-0"
+                    onclick="deleteCurrentFolder()" style="display:none;" title="删除当前整个文件夹">
+                    🗑️ <span class="d-none d-sm-inline">删除目录</span>
+                </button>
+            </div>
+
+            <!-- 右侧状态与工具 -->
+            <div class="ms-auto d-flex gap-2 align-items-center flex-shrink-0">
+                <span id="saveStatus"
+                    class="badge rounded-pill text-bg-secondary fw-normal small d-none d-sm-inline">就绪</span>
+                <button class="btn btn-sm btn-icon btn-outline-secondary border-0" onclick="toggleTheme()"
+                    id="themeBtn">🌙</button>
+                <button class="btn btn-sm btn-icon btn-outline-primary" onclick="openSettings()">⚙️</button>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-3">
-        <!-- 控制栏 -->
-        <div class="row g-2 align-items-center mb-3">
-            <div class="col-12 col-md-4">
-                <select id="fileSelector" class="form-select font-monospace" onchange="changeFile()">
-                    <option value="" disabled selected>正在连接 GitHub...</option>
-                </select>
-            </div>
-            <div class="col-12 col-md-8 d-flex gap-2 justify-content-md-end align-items-center">
-                <span id="saveStatus" class="badge rounded-pill text-bg-secondary fw-normal">就绪</span>
-                <button id="btnLoad" class="btn btn-primary" onclick="loadContent()">🔄 拉取 (Pull)</button>
-                <button id="btnSave" class="btn btn-success" onclick="manualSave()">💾 保存 (Push)</button>
-            </div>
-        </div>
+    <!-- 主容器 -->
+    <div class="container-fluid p-0">
+        <div class="row g-0" style="height: calc(100vh - 60px);">
 
-        <!-- 标签页切换 -->
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#view-pane">👁️ 预览</button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#edit-pane">✏️ 编辑 / 源码</button>
-            </li>
-        </ul>
-
-        <!-- 内容区域 -->
-        <div class="tab-content bg-body border border-top-0 p-3 rounded-bottom shadow-sm">
-            <!-- 预览面板 -->
-            <div class="tab-pane fade show active" id="view-pane">
-                <div class="d-flex justify-content-end mb-2">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard()">📋 复制全文</button>
+            <!-- 左侧侧边栏 -->
+            <div class="col-md-3 col-lg-2 offcanvas-md offcanvas-start bg-body-tertiary border-end h-100 d-flex flex-column"
+                tabindex="-1" id="sidebarMenu">
+                <div class="offcanvas-header border-bottom d-md-none">
+                    <h5 class="offcanvas-title fw-bold">📂 文件列表</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"
+                        data-bs-target="#sidebarMenu"></button>
                 </div>
-                <div id="markdown-preview" class="markdown-body">
-                    <p class="text-muted text-center my-5">请在左上角选择文件并点击“拉取”...</p>
+
+                <div class="offcanvas-body p-0 d-flex flex-column h-100">
+                    <!-- 新建操作 -->
+                    <div class="p-2 border-bottom d-flex gap-1 bg-body-tertiary">
+                        <button class="btn btn-sm btn-outline-success flex-grow-1 fw-bold" onclick="createNewFile()">➕
+                            新建文档</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="createNewFolder()"
+                            title="新建文件夹">📁</button>
+                    </div>
+
+                    <!-- 搜索框 -->
+                    <div class="px-2 py-2 border-bottom bg-body">
+                        <input type="text" id="fileSearchInput"
+                            class="form-control form-control-sm border-0 bg-body-tertiary" placeholder="🔍 搜索文件名..."
+                            oninput="filterFiles()">
+                    </div>
+
+                    <!-- 列表区 -->
+                    <div class="list-group list-group-flush overflow-y-auto flex-grow-1" id="fileListGroup">
+                        <div class="text-center p-4 text-muted small">加载中...</div>
+                    </div>
                 </div>
             </div>
-            <!-- 编辑面板 -->
-            <div class="tab-pane fade" id="edit-pane">
-                <textarea id="editor" class="form-control font-monospace border-0" rows="20"
-                    placeholder="支持 Markdown 和 YAML 格式..." oninput="handleInput()"></textarea>
+
+            <!-- 右侧编辑器 -->
+            <div class="col-12 col-md-9 col-lg-10 d-flex flex-column bg-body h-100">
+                <div
+                    class="d-flex justify-content-between align-items-center p-2 border-bottom bg-body-secondary bg-opacity-10">
+                    <div class="d-flex align-items-center overflow-hidden">
+                        <span id="currentFileName" class="fw-bold font-monospace px-2 text-truncate">未选择文件</span>
+                    </div>
+
+                    <!-- 编辑器功能按钮组 -->
+                    <div class="d-flex gap-1 flex-shrink-0">
+                        <button id="btnUpload" class="btn btn-sm btn-outline-secondary border-0 px-2 text-nowrap"
+                            onclick="triggerImageUpload()">
+                            🖼️ <span class="d-none d-sm-inline">上传</span>
+                        </button>
+                        <input type="file" id="imageFileInput" accept="image/*" style="display:none;"
+                            onchange="handleImageFileSelect(this)">
+
+                        <button id="btnDelete" class="btn btn-sm btn-outline-danger border-0 px-2 text-nowrap"
+                            onclick="deleteCurrentFile()" style="display:none;">
+                            🗑️ <span class="d-none d-sm-inline">删除</span>
+                        </button>
+
+                        <button id="btnLoad" class="btn btn-sm btn-outline-primary border-0 px-2 text-nowrap"
+                            onclick="loadContent()">
+                            🔄 <span class="d-none d-sm-inline">同步</span>
+                        </button>
+
+                        <button id="btnSave" class="btn btn-sm btn-success px-2 text-nowrap" onclick="manualSave()">
+                            💾 <span class="d-none d-sm-inline">保存</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 标签页 -->
+                <ul class="nav nav-tabs nav-tabs-sm px-2 pt-2 border-bottom-0 flex-shrink-0" id="myTab">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
+                            data-bs-target="#view-pane">👁️ 预览</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#edit-pane">✏️
+                            编辑</button></li>
+                </ul>
+
+                <div class="tab-content flex-grow-1 overflow-hidden position-relative">
+                    <div class="tab-pane fade show active h-100 overflow-y-auto p-3" id="view-pane">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard()">📋
+                                复制全文</button>
+                        </div>
+                        <div id="markdown-preview" class="markdown-body"></div>
+                    </div>
+                    <div class="tab-pane fade h-100" id="edit-pane">
+                        <textarea id="editor" class="form-control border-0 rounded-0 h-100 font-monospace p-3"
+                            style="resize: none;" placeholder="在此输入内容或粘贴图片..." oninput="handleInput()"></textarea>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 设置弹窗 -->
+    <!-- 配置弹窗 -->
     <div class="modal fade" id="settingsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">⚙️ 仓库配置</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5>⚙️ 仓库配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="configForm">
-                        <div class="mb-3">
-                            <label class="form-label">GitHub Token (PAT)</label>
-                            <input type="password" id="cfgToken" class="form-control" placeholder="ghp_..." required>
-                        </div>
+                        <div class="mb-3"><label class="form-label fw-bold">GitHub Token</label><input type="password"
+                                id="cfgToken" class="form-control" required></div>
                         <div class="row g-2 mb-3">
-                            <div class="col">
-                                <label class="form-label">用户名</label>
-                                <input type="text" id="cfgUser" class="form-control" placeholder="User" required>
-                            </div>
-                            <div class="col">
-                                <label class="form-label">私有仓库名</label>
-                                <input type="text" id="cfgRepo" class="form-control" placeholder="Repo" required>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-light border small text-muted">
-                            <strong>📲 移动端登录提示：</strong><br>
-                            请使用您的 <a href="#" onclick="alert('请访问您的 my-tools 仓库页面'); return false;"
-                                class="text-decoration-none fw-bold">🔐 独立认证工具 (my-tools)</a> 生成二维码。<br>
-                            手机扫码后将自动跳转回此处并完成登录。
+                            <div class="col"><label class="form-label fw-bold">Owner</label><input type="text"
+                                    id="cfgUser" class="form-control" required></div>
+                            <div class="col"><label class="form-label fw-bold">Repo</label><input type="text"
+                                    id="cfgRepo" class="form-control" required></div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary w-100" onclick="saveSettings()">保存配置</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-primary w-100"
+                        onclick="saveSettings()">保存配置并重载</button></div>
             </div>
         </div>
     </div>
 
-    <!-- 依赖库 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-    <!-- 核心逻辑 -->
     <script src="app.js"></script>
 </body>
 
