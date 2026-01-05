@@ -1,6 +1,6 @@
-/* --- 布局优化 --- */
+/* --- 1. 基础布局与美化 --- */
 
-/* Markdown 预览美化 */
+/* Markdown 预览区布局 */
 #markdown-preview {
     font-size: 16px;
     line-height: 1.7;
@@ -26,15 +26,6 @@
     color: #adb5bd;
 }
 
-/* 侧边栏列表激活样式 */
-.list-group-item.active {
-    background-color: var(--bs-primary-bg-subtle) !important;
-    color: var(--bs-primary-text-emphasis) !important;
-    border-color: transparent !important;
-    border-left: 4px solid var(--bs-primary) !important;
-    font-weight: bold;
-}
-
 /* 滚动条美化 */
 ::-webkit-scrollbar {
     width: 6px;
@@ -54,36 +45,82 @@
     background: #495057;
 }
 
-/* --- 按钮与交互优化 --- */
+/* --- 2. 侧边栏与文件列表 (核心更新) --- */
 
-/* 统一导航栏按钮不换行 */
+/* 侧边栏整体背景微调 */
+#sidebarMenu {
+    background-color: var(--bs-tertiary-bg);
+}
+
+/* [核心] 列表项激活/选中状态：增加强烈的视觉标识 */
+.list-group-item.active {
+    background-color: #0d6efd !important;
+    /* 使用标准 Bootstrap 蓝色 */
+    color: #ffffff !important;
+    /* 白色文字 */
+    border-color: #0d6efd !important;
+    font-weight: 600 !important;
+    position: relative;
+    /* 增加一个内阴影，让颜色更深邃 */
+    box-shadow: inset 5px 0 0 0 #004ab3 !important;
+}
+
+/* 悬停效果优化 */
+.list-group-item:hover:not(.active) {
+    background-color: var(--bs-secondary-bg-subtle);
+}
+
+/* 侧边栏区域分隔标签 */
+.offcanvas-body .small.text-muted {
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+}
+
+/* 侧边栏按钮微调 (更加紧凑) */
+.btn-xs {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    border-radius: 0.2rem;
+}
+
+/* --- 3. 导航栏与编辑器 --- */
+
+/* 导航栏按钮不换行 */
 .navbar .btn,
 .card-header .btn {
     white-space: nowrap !important;
 }
 
-/* 增大 PC 端按钮的点击感 */
+/* 在 PC 端增加按钮的点击面积 */
 @media (min-width: 576px) {
     .btn-sm {
         padding-left: 0.75rem !important;
         padding-right: 0.75rem !important;
-        font-weight: 500;
     }
 }
 
-/* 响应式：在窄屏下隐藏按钮文字，仅保留图标以节省空间 */
+/* 移动端自动隐藏编辑器标题栏的文字 */
 @media (max-width: 576px) {
-    .btn-sm span {
+    .card-header .btn span {
         display: none;
     }
 }
 
-/* 针对文件夹选择框的微调 */
-#folderSelector {
-    cursor: pointer;
-    transition: background-color 0.2s;
+/* 编辑器光标颜色及基础样式 */
+#editor {
+    caret-color: var(--bs-primary);
+    line-height: 1.6;
 }
 
-#folderSelector:hover {
-    background-color: var(--bs-secondary-bg) !important;
+/* --- 4. 暗黑模式补丁 --- */
+[data-bs-theme="dark"] .bg-body-secondary {
+    background-color: #2b3035 !important;
+}
+
+[data-bs-theme="dark"] .list-group-item.active {
+    background-color: #38b6ff !important;
+    /* 暗色模式下使用略浅的蓝色更舒服 */
+    box-shadow: inset 5px 0 0 0 #007bff !important;
 }
