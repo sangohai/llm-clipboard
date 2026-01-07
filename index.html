@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM 知识库 Pro</title>
-    <!-- CSS 依赖 -->
+    <link href="https://cdn. Taylor.com/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
     <link rel="stylesheet" href="style.css">
@@ -16,16 +16,9 @@
     <!-- 顶部导航栏 -->
     <nav class="navbar navbar-expand bg-body border-bottom shadow-sm" style="height: 60px;">
         <div class="container-fluid">
-            <!-- 手机端菜单按钮 -->
             <button class="btn btn-outline-secondary d-md-none me-2 border-0" type="button" data-bs-toggle="offcanvas"
-                data-bs-target="#sidebarMenu">
-                ☰
-            </button>
-
-            <!-- Logo -->
+                data-bs-target="#sidebarMenu">☰</button>
             <a class="navbar-brand fw-bold text-primary" href="#">📚 LLM Note</a>
-
-            <!-- 右侧工具 -->
             <div class="ms-auto d-flex gap-2 align-items-center">
                 <span id="saveStatus"
                     class="badge rounded-pill text-bg-secondary fw-normal small d-none d-sm-inline">就绪</span>
@@ -40,7 +33,7 @@
     <div class="container-fluid p-0">
         <div class="row g-0" style="height: calc(100vh - 60px);">
 
-            <!-- 左侧侧边栏：现在的核心导航中心 -->
+            <!-- 左侧侧边栏 -->
             <div class="col-md-3 col-lg-2 offcanvas-md offcanvas-start bg-body-tertiary border-end h-100 d-flex flex-column"
                 tabindex="-1" id="sidebarMenu">
                 <div class="offcanvas-header border-bottom">
@@ -48,9 +41,8 @@
                     <button type="button" class="btn-close" data-bs-dismiss="offcanvas"
                         data-bs-target="#sidebarMenu"></button>
                 </div>
-
                 <div class="offcanvas-body p-0 d-flex flex-column h-100">
-                    <!-- 1. 文件夹管理区 -->
+                    <!-- 文件夹管理区 -->
                     <div class="p-3 border-bottom bg-body-secondary bg-opacity-25">
                         <label class="small text-muted fw-bold mb-2 d-block">文档集 (文件夹)</label>
                         <select id="folderSelector" class="form-select form-select-sm fw-bold mb-2"
@@ -60,47 +52,45 @@
                         <div class="d-flex gap-1">
                             <button id="btnRenameFolder"
                                 class="btn btn-sm btn-outline-primary flex-grow-1 py-1 text-nowrap"
-                                onclick="renameCurrentFolder()" style="display:none;">✏️ 重命名</button>
+                                onclick="renameCurrentFolder()" style="display:none;">✏️ 重命名目录</button>
                             <button id="btnDeleteFolder"
                                 class="btn btn-sm btn-outline-danger flex-grow-1 py-1 text-nowrap"
                                 onclick="deleteCurrentFolder()" style="display:none;">🗑️ 删除目录</button>
                         </div>
                     </div>
-
-                    <!-- 2. 操作区：新建 -->
+                    <!-- 新建区 -->
                     <div class="p-3 border-bottom d-flex gap-1">
                         <button class="btn btn-sm btn-outline-success flex-grow-1 fw-bold" onclick="createNewFile()">➕
                             新建文档</button>
-                        <button class="btn btn-sm btn-outline-primary" onclick="createNewFolder()" title="新建文件夹">📁
-                            新建目录</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="createNewFolder()">📁 新建目录</button>
                     </div>
-
-                    <!-- 3. 搜索框 -->
+                    <!-- 搜索区 -->
                     <div class="px-3 py-2 border-bottom bg-body">
                         <input type="text" id="fileSearchInput"
                             class="form-control form-control-sm border-0 bg-body-tertiary" placeholder="🔍 搜索文件名..."
                             oninput="filterFiles()">
                     </div>
-
-                    <!-- 4. 文件列表滚动区 -->
-                    <div class="list-group list-group-flush overflow-y-auto flex-grow-1" id="fileListGroup">
-                        <div class="text-center p-4 text-muted small">加载中...</div>
-                    </div>
+                    <!-- 列表列表 -->
+                    <div class="list-group list-group-flush overflow-y-auto flex-grow-1" id="fileListGroup"></div>
                 </div>
             </div>
 
             <!-- 右侧编辑器 -->
             <div class="col-12 col-md-9 col-lg-10 d-flex flex-column bg-body h-100">
-                <!-- 编辑器标题栏 -->
                 <div
                     class="d-flex justify-content-between align-items-center p-2 border-bottom bg-body-secondary bg-opacity-10">
                     <div class="d-flex align-items-center overflow-hidden">
                         <span id="currentFileName" class="fw-bold font-monospace px-2 text-truncate">未选择文件</span>
                     </div>
-
                     <div class="d-flex gap-1 flex-shrink-0">
+                        <!-- [新增] 重命名文档按钮 -->
+                        <button id="btnRenameFile" class="btn btn-sm btn-outline-primary border-0 px-2"
+                            onclick="renameCurrentFile()" style="display:none;" title="重命名当前文档">
+                            ✏️ <span class="d-none d-sm-inline">重命名</span>
+                        </button>
+
                         <button id="btnUpload" class="btn btn-sm btn-outline-secondary border-0 px-2"
-                            onclick="triggerImageUpload()">
+                            onclick="triggerImageUpload()" title="上传图片">
                             🖼️ <span class="d-none d-sm-inline">上传</span>
                         </button>
                         <input type="file" id="imageFileInput" accept="image/*" style="display:none;"
@@ -112,7 +102,7 @@
                         </button>
 
                         <button id="btnLoad" class="btn btn-sm btn-outline-primary border-0 px-2"
-                            onclick="loadContent()">
+                            onclick="loadContent()" title="同步">
                             🔄 <span class="d-none d-sm-inline">同步</span>
                         </button>
 
@@ -122,7 +112,6 @@
                     </div>
                 </div>
 
-                <!-- 标签页 -->
                 <ul class="nav nav-tabs nav-tabs-sm px-2 pt-2 border-bottom-0 flex-shrink-0" id="myTab">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
                             data-bs-target="#view-pane">👁️ 预览</button></li>
@@ -147,22 +136,22 @@
         </div>
     </div>
 
-    <!-- 配置弹窗 -->
+    <!-- 配置 Modal 略... 保持不变 -->
     <div class="modal fade" id="settingsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5>⚙️ 仓库配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5>⚙️ 配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="configForm">
-                        <div class="mb-3"><label class="form-label fw-bold">GitHub Token</label><input type="password"
-                                id="cfgToken" class="form-control" required></div>
+                        <div class="mb-3"><label>GitHub Token</label><input type="password" id="cfgToken"
+                                class="form-control" required></div>
                         <div class="row g-2 mb-3">
-                            <div class="col"><label class="form-label fw-bold">用户名 (Owner)</label><input type="text"
-                                    id="cfgUser" class="form-control" required></div>
-                            <div class="col"><label class="form-label fw-bold">Repo</label><input type="text"
-                                    id="cfgRepo" class="form-control" required></div>
+                            <div class="col"><label>Owner</label><input type="text" id="cfgUser" class="form-control"
+                                    required></div>
+                            <div class="col"><label>Repo</label><input type="text" id="cfgRepo" class="form-control"
+                                    required></div>
                         </div>
                     </form>
                 </div>

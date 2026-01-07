@@ -9,14 +9,8 @@ const API_BASE = 'https://api.github.com/repos';
 
 // --- 初始化 ---
 document.addEventListener('DOMContentLoaded', () => {
-    checkImport();
-    loadSettings();
-    initTheme();
-    if (config.token && config.repo) {
-        fetchFolderList().then(() => fetchFileList());
-    } else {
-        openSettings();
-    }
+    checkImport(); loadSettings(); initTheme();
+    if (config.token && config.repo) { fetchFolderList().then(() => fetchFileList()); } else { openSettings(); }
     document.getElementById('editor').addEventListener('paste', handlePaste);
 });
 
@@ -44,27 +38,19 @@ async function handlePaste(e) {
     }
 }
 
-function triggerImageUpload() {
-    if (!config.path) { alert("请先选择或新建一个文档"); return; }
-    document.getElementById('imageFileInput').click();
-}
+function triggerImageUpload() { if (!config.path) { alert("请先选择文档"); return; } document.getElementById('imageFileInput').click(); }
 
-async function handleImageFileSelect(input) {
-    if (input.files && input.files[0]) {
-        await processAndUploadImage(input.files[0]);
-        input.value = ''; 
-    }
-}
+async function handleImageFileSelect(input) { if (input.files && input.files[0]) { await processAndUploadImage(input.files[0]); input.value = ''; } }
 
 async function processAndUploadImage(blob) {
     const editor = document.getElementById('editor');
     const start = editor.selectionStart;
     const fileName = `img_${Date.now()}.webp`;
     const filePath = `assets/images/${fileName}`;
-    const placeholder = `\n![上传图片中...](${filePath})\n`;
+    const placeholder = `\n![正在上传图片...](${filePath})\n`;
 
     editor.value = editor.value.substring(0, start) + placeholder + editor.value.substring(editor.selectionEnd);
-    setSaveStatus("loading", "正在上传图片...");
+    setSaveStatus("loading", "正在压缩并上传图片...");
 
     try {
         const base64Data = await compressImage(blob);
@@ -76,7 +62,7 @@ async function processAndUploadImage(blob) {
         });
         if (res.ok) {
             editor.value = editor.value.replace(placeholder, `\n![${fileName}](${filePath})\n`);
-            setSaveStatus("success", "图片已上传");
+            setSaveStatus("success", "图片上传成功");
             renderMarkdown(editor.value);
             manualSave();
         } else { throw new Error(); }
@@ -91,8 +77,7 @@ function compressImage(blob) {
         const reader = new FileReader();
         reader.readAsDataURL(blob);
         reader.onload = (e) => {
-            const img = new Image();
-            img.src = e.target.result;
+            const img = new Image(); img.src = e.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 let w = img.width, h = img.height;
@@ -122,7 +107,7 @@ async function fetchFolderList() {
             });
         }
         if (currentFolder) selector.value = currentFolder;
-    } catch (err) { console.error(err); }
+    } catch (err) {}
 }
 
 function changeFolder() {
@@ -134,8 +119,7 @@ function changeFolder() {
 }
 
 async function createNewFolder() {
-    let name = prompt("新文件夹名称:");
-    if (!name) return;
+    let name = prompt("文件夹名称:"); if (!name) return;
     const path = `${name.replace(/[\/\\]/g, '').trim()}/.gitkeep`;
     setSaveStatus("loading", "同步中...");
     try {
@@ -144,22 +128,21 @@ async function createNewFolder() {
             body: JSON.stringify({ message: `Create folder ${name}`, content: btoa("") })
         });
         if (res.ok) { await sleep(1000); await fetchFolderList(); document.getElementById('folderSelector').value = name; currentFolder = name; await fetchFileList(); }
-    } catch (e) { alert("失败"); }
-    finally { setSaveStatus("success", "就绪"); }
+    } catch (e) {} finally { setSaveStatus("success", "就绪"); }
 }
 
 async function renameCurrentFolder() {
     if (!currentFolder) return;
-    const newName = prompt(`重命名 [${currentFolder}] 为:`, currentFolder);
+    const newName = prompt(`将文件夹 [${currentFolder}] 重命名为:`, currentFolder);
     if (!newName || newName === currentFolder) return;
     const cleanNewName = newName.replace(/[\/\\]/g, '').trim();
     if (!confirm(`确定要批量重命名文件夹内的文件吗？`)) return;
-    setSaveStatus("loading", "正在搬迁路径...");
+    setSaveStatus("loading", "正在重命名路径...");
     try {
         const items = await (await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${currentFolder}?t=${Date.now()}`, { headers: { 'Authorization': `token ${config.token}` } })).json();
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            setSaveStatus("loading", `移动中 (${i + 1}/${items.length})`);
+            setSaveStatus("loading", `搬迁中 (${i + 1}/${items.length})`);
             const fileData = await (await fetch(item.url, { headers: { 'Authorization': `token ${config.token}` } })).json();
             await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${cleanNewName}/${item.name}`, {
                 method: 'PUT', headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
@@ -173,12 +156,12 @@ async function renameCurrentFolder() {
         await sleep(1000); const oldPath = currentFolder; currentFolder = cleanNewName;
         if (config.path.startsWith(oldPath + "/")) { config.path = config.path.replace(oldPath + "/", cleanNewName + "/"); saveConfigToLocal(); }
         await fetchFolderList(); document.getElementById('folderSelector').value = cleanNewName; await fetchFileList();
-    } catch (e) { alert("操作失败"); }
+    } catch (e) { alert("失败"); }
     finally { setSaveStatus("success", "就绪"); }
 }
 
 async function deleteCurrentFolder() {
-    if (!currentFolder || !confirm(`彻底删除文件夹 [${currentFolder}] 及其内容？`)) return;
+    if (!currentFolder || !confirm(`确定彻底删除文件夹 [${currentFolder}] 及其内容？`)) return;
     setSaveStatus("loading", "正在删除...");
     try {
         const items = await (await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${currentFolder}?t=${Date.now()}`, { headers: { 'Authorization': `token ${config.token}` } })).json();
@@ -189,8 +172,7 @@ async function deleteCurrentFolder() {
             });
         }
         await sleep(1500); currentFolder = ''; await fetchFolderList(); await fetchFileList();
-    } catch (e) { alert("失败"); }
-    finally { setSaveStatus("success", "就绪"); }
+    } catch (e) {} finally { setSaveStatus("success", "就绪"); }
 }
 
 // --- 文件操作 ---
@@ -205,9 +187,7 @@ async function fetchFileList() {
         listGroup.innerHTML = '';
         if (Array.isArray(data)) {
             data.filter(f => f.type === 'file' && /\.(md|txt|json)$/i.test(f.name)).forEach(file => {
-                const a = document.createElement('a');
-                a.href = "#";
-                // [核心] 添加 data-path 属性用于精确匹配高亮
+                const a = document.createElement('a'); a.href = "#";
                 a.setAttribute('data-path', file.path);
                 a.className = `list-group-item list-group-item-action py-2 ${file.path === config.path ? 'active' : ''}`;
                 a.innerHTML = `<span class="text-truncate fw-medium">${file.name}</span>`;
@@ -219,8 +199,7 @@ async function fetchFileList() {
 }
 
 async function createNewFile() {
-    let name = prompt("文件名:");
-    if (!name) return; if (!name.includes('.')) name += '.md';
+    let name = prompt("文件名:"); if (!name) return; if (!name.includes('.')) name += '.md';
     const path = currentFolder ? `${currentFolder}/${name}` : name;
     setSaveStatus("loading", "同步中...");
     try {
@@ -229,7 +208,46 @@ async function createNewFile() {
             body: JSON.stringify({ message: `Create ${path}`, content: encodeUnicode(`# ${name}\n`) })
         });
         if (res.ok) { await sleep(1000); await fetchFileList(); switchFile(path, name); }
-    } catch (e) { alert("失败"); }
+    } catch (e) {} finally { setSaveStatus("success", "就绪"); }
+}
+
+// [核心更新] 重命名文档
+async function renameCurrentFile() {
+    if (!config.path) return;
+    const oldPath = config.path;
+    const oldFileName = oldPath.split('/').pop();
+    let newFileName = prompt(`重命名文档 [${oldFileName}] 为:`, oldFileName);
+    if (!newFileName || newFileName === oldFileName) return;
+    if (!newFileName.includes('.')) newFileName += '.md';
+    newFileName = newFileName.trim();
+
+    const pathParts = oldPath.split('/'); pathParts.pop();
+    const newPath = pathParts.length > 0 ? `${pathParts.join('/')}/${newFileName}` : newFileName;
+
+    if (!confirm(`确定将文档重命名为 [${newFileName}] 吗？`)) return;
+    setSaveStatus("loading", "正在重命名...");
+
+    try {
+        const content = document.getElementById('editor').value;
+        const createRes = await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${newPath}`, {
+            method: 'PUT', headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Rename: ${oldFileName} -> ${newFileName}`, content: encodeUnicode(content) })
+        });
+        if (!createRes.ok) throw new Error();
+        const createData = await createRes.json();
+
+        await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${oldPath}`, {
+            method: 'DELETE', headers: { 'Authorization': `token ${config.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Cleanup old path`, sha: currentFileSha })
+        });
+
+        config.path = newPath; currentFileSha = createData.content.sha;
+        saveConfigToLocal();
+        await sleep(800);
+        document.getElementById('currentFileName').innerText = newFileName;
+        await fetchFileList(); 
+        alert("文档重命名成功！");
+    } catch (e) { alert("失败"); } finally { setSaveStatus("success", "就绪"); }
 }
 
 async function deleteCurrentFile() {
@@ -256,35 +274,29 @@ async function deleteCurrentFile() {
             }
             config.path = ''; await fetchFileList(); switchFile('', '');
         }
-    } catch (e) { alert("出错"); }
-    finally { setSaveStatus("success", "就绪"); }
+    } catch (e) {} finally { setSaveStatus("success", "就绪"); }
 }
 
 function switchFile(path, name) {
     config.path = path; saveConfigToLocal();
     updateCurrentUI(path, name);
     if (path) loadContent(); else { document.getElementById('editor').value = ''; renderMarkdown(''); }
-    // 移动端：选中文件后自动关闭侧边栏
     const sidebar = document.getElementById('sidebarMenu');
-    if (window.innerWidth < 768 && sidebar.classList.contains('show')) {
-        bootstrap.Offcanvas.getInstance(sidebar).hide();
-    }
+    if (window.innerWidth < 768 && sidebar.classList.contains('show')) { bootstrap.Offcanvas.getInstance(sidebar).hide(); }
 }
 
 function updateCurrentUI(fullPath, showName) {
     if (!showName) showName = fullPath.split('/').pop();
     document.getElementById('currentFileName').innerText = showName || '未选择文件';
+    // 更新按钮状态
     document.getElementById('btnDelete').style.display = fullPath ? 'inline-block' : 'none';
+    document.getElementById('btnRenameFile').style.display = fullPath ? 'inline-block' : 'none';
     
-    // [核心] 列表高亮逻辑
     const items = document.querySelectorAll('#fileListGroup a');
     items.forEach(el => {
         if (el.getAttribute('data-path') === fullPath) {
-            el.classList.add('active');
-            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } else {
-            el.classList.remove('active');
-        }
+            el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else { el.classList.remove('active'); }
     });
 }
 
@@ -315,68 +327,38 @@ async function pushContent() {
     } catch (e) { setSaveStatus("error", "失败"); }
 }
 
-function handleInput() {
-    setSaveStatus("unsaved", "等待保存...");
-    renderMarkdown(document.getElementById('editor').value);
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(pushContent, 5000);
-}
+function handleInput() { setSaveStatus("unsaved", "等待保存..."); renderMarkdown(document.getElementById('editor').value); clearTimeout(autoSaveTimer); autoSaveTimer = setTimeout(pushContent, 5000); }
 
-// --- 增强渲染 (私有图片支持) ---
 async function renderMarkdown(text) {
     const preview = document.getElementById('markdown-preview');
     preview.innerHTML = marked.parse(text || '');
     preview.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
-
     const imgs = preview.querySelectorAll('img');
     for (let img of imgs) {
         const src = img.getAttribute('src');
         if (src && src.includes('assets/images') && !src.startsWith('http')) {
-            if (imageCache.has(src)) {
-                img.src = imageCache.get(src);
-            } else {
+            if (imageCache.has(src)) { img.src = imageCache.get(src); } else {
                 try {
                     const res = await fetch(`${API_BASE}/${config.owner}/${config.repo}/contents/${src}`, { headers: { 'Authorization': `token ${config.token}` } });
                     const data = await res.json();
                     const blob = await (await fetch(`data:image/webp;base64,${data.content}`)).blob();
-                    const objUrl = URL.createObjectURL(blob);
-                    imageCache.set(src, objUrl);
-                    img.src = objUrl;
+                    const objUrl = URL.createObjectURL(blob); imageCache.set(src, objUrl); img.src = objUrl;
                 } catch (e) {}
             }
         }
     }
 }
 
-// --- 基础工具 ---
 function encodeUnicode(s) { return btoa(encodeURIComponent(s).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode('0x' + p1))); }
 function decodeUnicode(s) { return decodeURIComponent(atob(s).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
-function setSaveStatus(s, t) {
-    const el = document.getElementById('saveStatus'); el.innerText = t;
-    el.className = 'badge rounded-pill fw-normal small ' + (s==='loading'?'text-bg-warning':s==='success'?'text-bg-success':s==='error'?'text-bg-danger':'text-bg-secondary');
-}
+function setSaveStatus(s, t) { const el = document.getElementById('saveStatus'); el.innerText = t; el.className = 'badge rounded-pill fw-normal small ' + (s==='loading'?'text-bg-warning':s==='success'?'text-bg-success':s==='error'?'text-bg-danger':'text-bg-secondary'); }
 function manualSave() { clearTimeout(autoSaveTimer); pushContent(); }
 function loadSettings() { const s = localStorage.getItem('llm_clip_config'); if(s) config = JSON.parse(s); }
 function saveConfigToLocal() { localStorage.setItem('llm_clip_config', JSON.stringify(config)); }
-function saveSettings() {
-    config.token = document.getElementById('cfgToken').value.trim();
-    config.owner = document.getElementById('cfgUser').value.trim();
-    config.repo = document.getElementById('cfgRepo').value.trim();
-    saveConfigToLocal(); location.reload();
-}
-function openSettings() { 
-    new bootstrap.Modal(document.getElementById('settingsModal')).show();
-    document.getElementById('cfgToken').value = config.token;
-    document.getElementById('cfgUser').value = config.owner;
-    document.getElementById('cfgRepo').value = config.repo;
-}
+function saveSettings() { config.token = document.getElementById('cfgToken').value.trim(); config.owner = document.getElementById('cfgUser').value.trim(); config.repo = document.getElementById('cfgRepo').value.trim(); saveConfigToLocal(); location.reload(); }
+function openSettings() { new bootstrap.Modal(document.getElementById('settingsModal')).show(); document.getElementById('cfgToken').value = config.token; document.getElementById('cfgUser').value = config.owner; document.getElementById('cfgRepo').value = config.repo; }
 function toggleTheme() { isDark = !isDark; localStorage.setItem('theme', isDark?'dark':'light'); applyTheme(); }
 function applyTheme() { document.documentElement.setAttribute('data-bs-theme', isDark?'dark':'light'); document.getElementById('themeBtn').innerText = isDark?'☀️':'🌙'; }
 function initTheme() { isDark = localStorage.getItem('theme')==='dark'; applyTheme(); }
-function checkImport() {
-    const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
-    const data = params.get('import');
-    if (data) { localStorage.setItem('llm_clip_config', atob(data)); history.replaceState(null,null,window.location.pathname); location.reload(); }
-}
+function checkImport() { const hash = window.location.hash.substring(1); const params = new URLSearchParams(hash); const data = params.get('import'); if (data) { localStorage.setItem('llm_clip_config', atob(data)); history.replaceState(null,null,window.location.pathname); location.reload(); } }
 function copyToClipboard() { navigator.clipboard.writeText(document.getElementById('editor').value).then(()=>alert("已复制")); }
