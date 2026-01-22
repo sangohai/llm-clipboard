@@ -1,6 +1,4 @@
-/* --- 1. 基础布局与美化 --- */
-
-/* Markdown 预览区布局 */
+/* --- UI 美化 --- */
 #markdown-preview {
     font-size: 16px;
     line-height: 1.7;
@@ -26,14 +24,51 @@
     color: #adb5bd;
 }
 
-/* 滚动条美化 */
+/* 列表选中高亮 */
+.list-group-item.active {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    border-color: #0d6efd !important;
+    font-weight: 600 !important;
+    position: relative;
+    box-shadow: inset 5px 0 0 0 #004ab3 !important;
+}
+
+/* 技能卡片样式 */
+.skill-card {
+    transition: all 0.3s ease;
+    border-style: dashed !important;
+}
+
+.skill-card:hover {
+    background-color: rgba(13, 110, 253, 0.15) !important;
+}
+
+.small-text {
+    font-size: 0.7rem;
+    line-height: 1.3;
+}
+
+/* 代码预览美化 */
+#markdown-preview pre {
+    background-color: #1e1e1e !important;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #333;
+    overflow-x: auto;
+}
+
+#markdown-preview pre code {
+    font-family: 'Cascadia Code', Consolas, monospace;
+    font-size: 0.85rem;
+    color: #dcdcdc;
+    background: transparent;
+}
+
+/* 滚动条 */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -45,82 +80,9 @@
     background: #495057;
 }
 
-/* --- 2. 侧边栏与文件列表 (核心更新) --- */
-
-/* 侧边栏整体背景微调 */
-#sidebarMenu {
-    background-color: var(--bs-tertiary-bg);
-}
-
-/* [核心] 列表项激活/选中状态：增加强烈的视觉标识 */
-.list-group-item.active {
-    background-color: #0d6efd !important;
-    /* 使用标准 Bootstrap 蓝色 */
-    color: #ffffff !important;
-    /* 白色文字 */
-    border-color: #0d6efd !important;
-    font-weight: 600 !important;
-    position: relative;
-    /* 增加一个内阴影，让颜色更深邃 */
-    box-shadow: inset 5px 0 0 0 #004ab3 !important;
-}
-
-/* 悬停效果优化 */
-.list-group-item:hover:not(.active) {
-    background-color: var(--bs-secondary-bg-subtle);
-}
-
-/* 侧边栏区域分隔标签 */
-.offcanvas-body .small.text-muted {
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-}
-
-/* 侧边栏按钮微调 (更加紧凑) */
-.btn-xs {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.75rem;
-    line-height: 1.2;
-    border-radius: 0.2rem;
-}
-
-/* --- 3. 导航栏与编辑器 --- */
-
-/* 导航栏按钮不换行 */
-.navbar .btn,
-.card-header .btn {
-    white-space: nowrap !important;
-}
-
-/* 在 PC 端增加按钮的点击面积 */
-@media (min-width: 576px) {
-    .btn-sm {
-        padding-left: 0.75rem !important;
-        padding-right: 0.75rem !important;
-    }
-}
-
-/* 移动端自动隐藏编辑器标题栏的文字 */
+/* 响应式 */
 @media (max-width: 576px) {
-    .card-header .btn span {
+    .btn-sm span {
         display: none;
     }
-}
-
-/* 编辑器光标颜色及基础样式 */
-#editor {
-    caret-color: var(--bs-primary);
-    line-height: 1.6;
-}
-
-/* --- 4. 暗黑模式补丁 --- */
-[data-bs-theme="dark"] .bg-body-secondary {
-    background-color: #2b3035 !important;
-}
-
-[data-bs-theme="dark"] .list-group-item.active {
-    background-color: #38b6ff !important;
-    /* 暗色模式下使用略浅的蓝色更舒服 */
-    box-shadow: inset 5px 0 0 0 #007bff !important;
 }

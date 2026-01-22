@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM 知识库 Pro</title>
-    <link href="https://cdn. Taylor.com/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>AI 开发者工作站 - LLM Note Pro</title>
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Highlight.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -18,7 +19,10 @@
         <div class="container-fluid">
             <button class="btn btn-outline-secondary d-md-none me-2 border-0" type="button" data-bs-toggle="offcanvas"
                 data-bs-target="#sidebarMenu">☰</button>
-            <a class="navbar-brand fw-bold text-primary" href="#">📚 LLM Note</a>
+            <a class="navbar-brand fw-bold text-primary d-flex align-items-center" href="#">
+                📚 LLM Note <span class="badge text-bg-primary ms-2" style="font-size: 0.6rem; letter-spacing: 1px;">AI
+                    SKILL STATION</span>
+            </a>
             <div class="ms-auto d-flex gap-2 align-items-center">
                 <span id="saveStatus"
                     class="badge rounded-pill text-bg-secondary fw-normal small d-none d-sm-inline">就绪</span>
@@ -41,126 +45,157 @@
                     <button type="button" class="btn-close" data-bs-dismiss="offcanvas"
                         data-bs-target="#sidebarMenu"></button>
                 </div>
+
                 <div class="offcanvas-body p-0 d-flex flex-column h-100">
-                    <!-- 文件夹管理区 -->
+
+                    <!-- 1. 文件夹与技能管理区 -->
                     <div class="p-3 border-bottom bg-body-secondary bg-opacity-25">
-                        <label class="small text-muted fw-bold mb-2 d-block">文档集 (文件夹)</label>
-                        <select id="folderSelector" class="form-select form-select-sm fw-bold mb-2"
+
+                        <!-- [新增] 技能 Manifest 卡片 -->
+                        <div id="manifestBanner"
+                            class="skill-card mb-3 p-2 bg-primary bg-opacity-10 border border-primary border-opacity-25 rounded"
+                            style="display:none;">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge text-bg-primary" style="font-size: 0.55rem;">SKILL CONFIG</span>
+                                <span id="skillVersion" class="text-muted font-monospace"
+                                    style="font-size: 0.6rem;">v1.0.0</span>
+                            </div>
+                            <h6 id="skillName" class="fw-bold mb-1 small text-primary text-truncate">未命名技能</h6>
+                            <p id="skillDesc" class="text-muted mb-2 small-text">识别到技能配置文件...</p>
+                            <!-- [新增] 一键聚合 Context 按钮 -->
+                            <button id="btnCopyContext"
+                                class="btn btn-primary btn-sm w-100 py-1 fw-bold border-0 shadow-sm"
+                                onclick="copyFolderContext()">
+                                🚀 聚合技能上下文
+                            </button>
+                        </div>
+
+                        <label class="small text-muted fw-bold mb-2 d-block text-uppercase"
+                            style="font-size: 0.65rem;">当前文档集</label>
+                        <select id="folderSelector" class="form-select form-select-sm fw-bold mb-2 shadow-sm"
                             onchange="changeFolder()">
                             <option value="">📂 根目录 (Root)</option>
                         </select>
                         <div class="d-flex gap-1">
                             <button id="btnRenameFolder"
                                 class="btn btn-sm btn-outline-primary flex-grow-1 py-1 text-nowrap"
-                                onclick="renameCurrentFolder()" style="display:none;">✏️ 重命名目录</button>
+                                onclick="renameCurrentFolder()" style="display:none;">✏️ 重命名</button>
                             <button id="btnDeleteFolder"
                                 class="btn btn-sm btn-outline-danger flex-grow-1 py-1 text-nowrap"
-                                onclick="deleteCurrentFolder()" style="display:none;">🗑️ 删除目录</button>
+                                onclick="deleteCurrentFolder()" style="display:none;">🗑️ 删除</button>
                         </div>
                     </div>
-                    <!-- 新建区 -->
+
+                    <!-- 2. 操作区 -->
                     <div class="p-3 border-bottom d-flex gap-1">
                         <button class="btn btn-sm btn-outline-success flex-grow-1 fw-bold" onclick="createNewFile()">➕
                             新建文档</button>
-                        <button class="btn btn-sm btn-outline-primary" onclick="createNewFolder()">📁 新建目录</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="createNewFolder()" title="新建文件夹">📁
+                            新建目录</button>
                     </div>
-                    <!-- 搜索区 -->
+
+                    <!-- 3. 搜索框 -->
                     <div class="px-3 py-2 border-bottom bg-body">
                         <input type="text" id="fileSearchInput"
                             class="form-control form-control-sm border-0 bg-body-tertiary" placeholder="🔍 搜索文件名..."
                             oninput="filterFiles()">
                     </div>
-                    <!-- 列表列表 -->
-                    <div class="list-group list-group-flush overflow-y-auto flex-grow-1" id="fileListGroup"></div>
+
+                    <!-- 4. 列表区 -->
+                    <div class="list-group list-group-flush overflow-y-auto flex-grow-1" id="fileListGroup">
+                        <div class="text-center p-4 text-muted small">加载中...</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 右侧编辑器 -->
+            <!-- 右侧编辑器主体 -->
             <div class="col-12 col-md-9 col-lg-10 d-flex flex-column bg-body h-100">
+                <!-- 标题栏 -->
                 <div
                     class="d-flex justify-content-between align-items-center p-2 border-bottom bg-body-secondary bg-opacity-10">
                     <div class="d-flex align-items-center overflow-hidden">
                         <span id="currentFileName" class="fw-bold font-monospace px-2 text-truncate">未选择文件</span>
                     </div>
+
                     <div class="d-flex gap-1 flex-shrink-0">
-                        <!-- [新增] 重命名文档按钮 -->
-                        <button id="btnRenameFile" class="btn btn-sm btn-outline-primary border-0 px-2"
-                            onclick="renameCurrentFile()" style="display:none;" title="重命名当前文档">
+                        <button id="btnRenameFile" class="btn btn-sm btn-outline-primary border-0 px-2 text-nowrap"
+                            onclick="renameCurrentFile()" style="display:none;">
                             ✏️ <span class="d-none d-sm-inline">重命名</span>
                         </button>
-
-                        <button id="btnUpload" class="btn btn-sm btn-outline-secondary border-0 px-2"
-                            onclick="triggerImageUpload()" title="上传图片">
-                            🖼️ <span class="d-none d-sm-inline">上传</span>
+                        <button id="btnUpload" class="btn btn-sm btn-outline-secondary border-0 px-2 text-nowrap"
+                            onclick="triggerImageUpload()">
+                            🖼️ <span class="d-none d-sm-inline">上传图片</span>
                         </button>
                         <input type="file" id="imageFileInput" accept="image/*" style="display:none;"
                             onchange="handleImageFileSelect(this)">
-
-                        <button id="btnDelete" class="btn btn-sm btn-outline-danger border-0 px-2"
+                        <button id="btnDelete" class="btn btn-sm btn-outline-danger border-0 px-2 text-nowrap"
                             onclick="deleteCurrentFile()" style="display:none;">
                             🗑️ <span class="d-none d-sm-inline">删除</span>
                         </button>
-
-                        <button id="btnLoad" class="btn btn-sm btn-outline-primary border-0 px-2"
-                            onclick="loadContent()" title="同步">
+                        <button id="btnLoad" class="btn btn-sm btn-outline-primary border-0 px-2 text-nowrap"
+                            onclick="loadContent()">
                             🔄 <span class="d-none d-sm-inline">同步</span>
                         </button>
-
-                        <button id="btnSave" class="btn btn-sm btn-success px-2" onclick="manualSave()">
+                        <button id="btnSave" class="btn btn-sm btn-success px-2 text-nowrap" onclick="manualSave()">
                             💾 <span class="d-none d-sm-inline">保存</span>
                         </button>
                     </div>
                 </div>
 
+                <!-- 标签页 -->
                 <ul class="nav nav-tabs nav-tabs-sm px-2 pt-2 border-bottom-0 flex-shrink-0" id="myTab">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
-                            data-bs-target="#view-pane">👁️ 预览</button></li>
+                            data-bs-target="#view-pane">👁️ 预览 / 数据展示</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#edit-pane">✏️
-                            编辑</button></li>
+                            源码编辑</button></li>
                 </ul>
 
                 <div class="tab-content flex-grow-1 overflow-hidden position-relative">
+                    <!-- 预览面板 -->
                     <div class="tab-pane fade show active h-100 overflow-y-auto p-3" id="view-pane">
                         <div class="d-flex justify-content-end mb-2">
                             <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard()">📋
-                                复制全文</button>
+                                复制原文</button>
                         </div>
                         <div id="markdown-preview" class="markdown-body"></div>
                     </div>
+                    <!-- 编辑面板 -->
                     <div class="tab-pane fade h-100" id="edit-pane">
                         <textarea id="editor" class="form-control border-0 rounded-0 h-100 font-monospace p-3"
-                            style="resize: none;" placeholder="在此输入内容或粘贴图片..." oninput="handleInput()"></textarea>
+                            style="resize: none;" placeholder="在此输入 Markdown / JSON / YAML 内容..."
+                            oninput="handleInput()"></textarea>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 配置 Modal 略... 保持不变 -->
+    <!-- 配置 Modal -->
     <div class="modal fade" id="settingsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5>⚙️ 配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5>⚙️ 仓库配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="configForm">
-                        <div class="mb-3"><label>GitHub Token</label><input type="password" id="cfgToken"
-                                class="form-control" required></div>
+                        <div class="mb-3"><label class="form-label fw-bold">GitHub Token</label><input type="password"
+                                id="cfgToken" class="form-control" required></div>
                         <div class="row g-2 mb-3">
-                            <div class="col"><label>Owner</label><input type="text" id="cfgUser" class="form-control"
-                                    required></div>
-                            <div class="col"><label>Repo</label><input type="text" id="cfgRepo" class="form-control"
-                                    required></div>
+                            <div class="col"><label class="form-label fw-bold">Owner</label><input type="text"
+                                    id="cfgUser" class="form-control" required></div>
+                            <div class="col"><label class="form-label fw-bold">Repo</label><input type="text"
+                                    id="cfgRepo" class="form-control" required></div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-primary w-100"
-                        onclick="saveSettings()">保存配置并刷新</button></div>
+                        onclick="saveSettings()">保存配置并重载数据</button></div>
             </div>
         </div>
     </div>
 
+    <!-- 脚本依赖 -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
